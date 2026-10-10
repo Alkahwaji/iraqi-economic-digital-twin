@@ -1,0 +1,85 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Iraqi Economic Digital Twin (IEDT)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+:root{--bg:#f6f4ef;--card:#fff;--tx:#1d2330;--mu:#6b7280;--ln:#e3dfd6;--ac:#0f6b5c;--b:#9aa3af;--r:#c2410c;--box-sizing:border-box;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12161c;--card:#1b212b;--tx:#e8eaed;--mu:#9aa3af;--ln:#2c3440;--ac:#3fc3a8;--b:#6b7280;--r:#fb923c}}
+:root[data-theme="dark"]{--bg:#12161c;--card:#1b212b;--tx:#e8eaed;--mu:#9aa3af;--ln:#2c3440;--ac:#3fc3a8;--b:#6b7280;--r:#fb923c}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.45 Georgia,'Times New Roman',serif}
+h1{font-size:20px;margin:0}h2{font-size:13px;margin:0 0 8px;text-transform:uppercase;letter-spacing:.06em;color:var(--mu);font-family:system-ui,sans-serif}
+header{padding:14px 16px;border-bottom:1px solid var(--ln)}header p{margin:4px 0 0;color:var(--mu);font-size:12px}
+main{display:grid;grid-template-columns:300px 1fr;gap:12px;padding:12px;max-width:1200px;margin:auto}
+@media(max-width:800px){main{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--ln);border-radius:10px;padding:12px}
+label{display:block;font:12px system-ui,sans-serif;margin:8px 0 2px;display:flex;justify-content:space-between}
+input[type=range]{width:100%;accent-color:var(--ac)}
+button{font:12px system-ui,sans-serif;border:1px solid var(--ln);background:var(--card);color:var(--tx);padding:5px 8px;border-radius:6px;cursor:pointer;margin:2px 2px 2px 0}button:hover,button.on{border-color:var(--ac);color:var(--ac)}
+.kp{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:12px}
+.kp div{background:var(--card);border:1px solid var(--ln);border-radius:10px;padding:8px 10px;font:11px system-ui,sans-serif;color:var(--mu)}.kp b{display:block;font:600 18px Georgia,serif;color:var(--tx)}
+.g{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+svg{width:100%;height:auto;display:block}svg text{fill:var(--mu);font:10px system-ui,sans-serif}
+.lg{font:11px system-ui,sans-serif;color:var(--mu)}.lg i{display:inline-block;width:10px;height:3px;margin:0 4px 2px 8px}
+input[type=number]{width:70px;font:12px system-ui;background:var(--bg);color:var(--tx);border:1px solid var(--ln);border-radius:4px;padding:2px}
+.note{font:11px system-ui,sans-serif;color:var(--mu);margin-top:8px}
+</style></head><body>
+<header><h1>Iraqi Economic Digital Twin (IEDT)</h1><p>Minimum viable model from the paper · annual, nominal, IQD trillion · 2024 anchor, 2025–2030 projection · oil-fiscal-financing-investment-import-reserve engine with Monte Carlo and anomaly layers</p></header>
+<main>
+<aside class="card"><h2>Scenario controls</h2>
+<div><button onclick="pre('base')">Baseline</button><button onclick="pre('oil')">Oil −20%</button><button onclick="pre('dr')">Drought</button><button onclick="pre('fin')">Fin. stress</button><button onclick="pre('comp')">Compound</button><button onclick="pre('c10')">−10% compound</button><button onclick="pre('prot')">Protect capex</button></div>
+<div id="ctl"></div>
+<h2 style="margin-top:14px">State estimation (anomaly)</h2>
+<div class="lg">Enter observed 2025 values; compare to baseline ensemble.</div>
+<label>Deficit % GDP <input type="number" id="od" value="7.5" step=".1"></label>
+<label>Reserves US$bn <input type="number" id="or" value="91" step=".5"></label>
+<button onclick="anom()">Compute anomaly</button><div id="an" class="note"></div>
+</aside>
+<section>
+<div class="kp" id="kp"></div>
+<div class="g" id="ch"></div>
+<div class="card" style="margin-top:12px"><h2>Monte Carlo robustness <button onclick="mc()">Run 2,000 draws</button></h2>
+<div class="lg">Draws vary k_cap, ψ, ρ, d*, financing ceiling. Band = 5–95%, line = median, scenario vs baseline.</div><div id="mc"></div></div>
+<div class="note">Calibrated to 2024 accounts (GDP 327.6; C 168.7; G 80.6; GFCF 52.2; X 144.6; M 135.9). Baseline oil-price path and reserve outflow offset are assumptions tuned to approximate IMF 2025 moments; behavioural parameters are ranges, not known constants. Not a forecast.</div>
+</section></main>
+<script>
+const BASE=[.92,.90,.90,.90,.90,.90],YR=[2025,2026,2027,2028,2029,2030];
+const D={oil:0,dr:0,dur:2,fin:0,wg:.03,capm:1,k:.7,psi:.5,rho:.6,ds:.05,ceil:.075,off:4.5};
+const S=[['oil','Oil-price decline',0,.4,.01,'%'],['dr','Drought severity',0,.5,.01,'%'],['dur','Drought years',0,6,1,''],['fin','Financial stress shock (/yr, 2025–26)',0,.15,.01,''],['wg','Wage-bill growth',-.02,.06,.005,'%'],['capm','Capex target multiplier',.5,1.5,.05,'×'],['k','k_cap (capex absorbs excess)',.2,1,.05,''],['psi','ψ (stress→investment)',.1,1,.05,''],['off','Capital-outflow offset (US$bn/yr)',0,10,.5,'']];
+let P={...D};
+function sim(p){let Yp=327.6,FS=0,R=100.3,o=[];
+for(let t=1;t<=6;t++){const Xo=135*BASE[t-1]*(1-p.oil),X=Xo+9.6*1.03**t,Rev=.873*Xo+.033*Yp;
+const dAg=t<=p.dur?.05*327.6*p.dr:0,Sup=.3*dAg,Wg=72.1*(1+p.wg)**t,Oth=43.9*1.02**t,ct=26.5*p.capm;
+const pre=Wg+Oth+Sup+ct-Rev,ex=Math.max(0,pre-p.ceil*Yp),cap=Math.max(0,ct-p.k*ex),arr=(1-p.k)*ex,def=Wg+Oth+Sup+cap-Rev;
+FS=p.rho*FS+Math.max(0,def/Yp-p.ds)+(t<=2?p.fin:0);
+const I=Math.max(0,52.2*1.03**t*(1-Math.min(1,p.psi*FS))-.5*arr),C=.5*(Wg+.5*Oth+Sup)+.371*Yp,G=.695*(Wg+Oth);
+let M=.4*C+.45*I+.2*G+28.8*1.03**t+.9*dAg;if(R<40)M*=.8;
+const Y=C+G+I+X-M+17.4*1.03**t-dAg;R=R+(X-M-2.15)*1000/1310-p.off;
+o.push({def:100*def/Yp,cap,I,no:Y-Xo,R,FS,M,Y,arr});Yp=Y}return o}
+const rows={def:['Deficit (% GDP)',1],cap:['Capital expenditure (IQD tn)',1],I:['Private investment (IQD tn)',1],no:['Non-oil GDP proxy (IQD tn)',1],R:['Reserves (US$ bn)',1],FS:['Financing stress index',2]};
+function ctl(){document.getElementById('ctl').innerHTML=S.map(([k,n,a,b,s,u])=>`<label>${n}<span id="v${k}"></span></label><input type=range min=${a} max=${b} step=${s} value=${P[k]} oninput="P.${k}=+this.value;run()">`).join('')}
+function fv(k,u){const v=P[k];return u=='%'?(v*100).toFixed(1)+'%':u=='×'?v.toFixed(2)+'×':v}
+function line(title,ser,band,fmt){const W=320,H=170,m={l:38,r:8,t:8,b:20};let all=ser.flatMap(s=>s.v);if(band)all=all.concat(band.lo,band.hi);
+let mn=Math.min(...all),mx=Math.max(...all);if(mn==mx){mn-=1;mx+=1}const pd=(mx-mn)*.08;mn-=pd;mx+=pd;
+const x=i=>m.l+i*(W-m.l-m.r)/5,y=v=>m.t+(1-(v-mn)/(mx-mn))*(H-m.t-m.b);
+let s=`<svg viewBox="0 0 ${W} ${H}">`;for(let i=0;i<4;i++){const v=mn+(mx-mn)*i/3;s+=`<line x1=${m.l} x2=${W-m.r} y1=${y(v)} y2=${y(v)} stroke="var(--ln)"/><text x=${m.l-4} y=${y(v)+3} text-anchor=end>${fmt?fmt(v):v.toFixed(1)}</text>`}
+YR.forEach((a,i)=>s+=`<text x=${x(i)} y=${H-6} text-anchor=middle>${a}</text>`);
+if(band)s+=`<polygon fill="var(--r)" opacity=".2" points="${band.hi.map((v,i)=>x(i)+','+y(v)).join(' ')} ${band.lo.map((v,i)=>[x(i),y(v)]).reverse().join(' ')}"/>`;
+ser.forEach(q=>s+=`<polyline fill=none stroke="${q.c}" stroke-width=2 ${q.d?'stroke-dasharray="4 3"':''} points="${q.v.map((v,i)=>x(i)+','+y(v)).join(' ')}"/>`);return `<div><div class=lg style="color:var(--tx)">${title}</div>${s}</svg></div>`}
+let B=sim(D);
+function run(){S.forEach(([k,,,,,u])=>document.getElementById('v'+k).textContent=fv(k,u));
+const A=sim(P),L=A[5],b=B[5];
+const kp=[['Deficit 2030',L.def.toFixed(1)+'% GDP',(L.def-b.def).toFixed(1)+' pp vs base'],['Capex 2030',L.cap.toFixed(1),pc(L.cap,b.cap)],['Private inv. 2030',L.I.toFixed(1),pc(L.I,b.I)],['Non-oil GDP 2030',L.no.toFixed(0),pc(L.no,b.no)],['Reserves 2030','$'+L.R.toFixed(0)+'bn',(L.R-b.R).toFixed(0)+'bn vs base'],['Cum. non-oil GDP',pc(sum(A,'no'),sum(B,'no')),'2025–30 vs base']];
+document.getElementById('kp').innerHTML=kp.map(a=>`<div>${a[0]}<b>${a[1]}</b>${a[2]}</div>`).join('');
+document.getElementById('ch').innerHTML=Object.entries(rows).map(([k,[n,d]])=>line(n,[{v:B.map(r=>r[k]),c:'var(--b)',d:1},{v:A.map(r=>r[k]),c:'var(--ac)'}],0,d==2?v=>v.toFixed(2):null)).join('')+`<div class=lg><i style="background:var(--b)"></i>Baseline <i style="background:var(--ac)"></i>Scenario</div>`}
+const sum=(a,k)=>a.reduce((s,r)=>s+r[k],0),pc=(a,b)=>((a/b-1)*100).toFixed(1)+'%'+(b?' vs base':'');
+function pre(n){P={...D};const m={oil:{oil:.2},dr:{dr:.25},fin:{fin:.08},comp:{oil:.2,dr:.25,fin:.08},c10:{oil:.1,dr:.25,fin:.08},prot:{oil:.2,capm:1.2,wg:0},base:{}};Object.assign(P,m[n]);ctl();run()}
+function rnd(a,b){return a+Math.random()*(b-a)}
+function draw(){return{k:rnd(.4,.9),psi:rnd(.2,.8),rho:rnd(.3,.8),ds:rnd(.03,.07),ceil:rnd(.06,.09)}}
+const q=(a,f)=>{a=a.slice().sort((x,y)=>x-y);return a[Math.floor(f*(a.length-1))]};
+function mc(){const N=2000,dev=[],res=[],cap=[];for(let i=0;i<N;i++){const d=draw(),a=sim({...P,...d}),b=sim({...D,...d});dev.push(a.map((r,j)=>100*(r.no/b[j].no-1)));res.push(a[5].R);cap.push(a[5].cap)}
+const col=j=>dev.map(r=>r[j]);const band={lo:YR.map((_,j)=>q(col(j),.05)),hi:YR.map((_,j)=>q(col(j),.95))};
+document.getElementById('mc').innerHTML=line('Non-oil GDP deviation from baseline (%)',[{v:YR.map((_,j)=>q(col(j),.5)),c:'var(--r)'}],band)+`<div class=note>2030 reserves p5/p50/p95: $${q(res,.05).toFixed(0)} / $${q(res,.5).toFixed(0)} / $${q(res,.95).toFixed(0)}bn · 2030 capex p5/p50/p95: ${q(cap,.05).toFixed(1)} / ${q(cap,.5).toFixed(1)} / ${q(cap,.95).toFixed(1)} tn</div>`}
+function anom(){const d=[],r=[];for(let i=0;i<400;i++){const a=sim({...D,...draw(),off:rnd(3,6)})[0];d.push(a.def);r.push(a.R)}
+const z=(v,a)=>{const m=a.reduce((s,x)=>s+x)/a.length,sd=Math.sqrt(a.reduce((s,x)=>s+(x-m)**2,0)/a.length)||1;return[(v-m)/sd,m]};
+const [zd,md]=z(+od.value,d),[zr,mr]=z(+or.value,r),s=Math.max(Math.abs(zd),Math.abs(zr));
+an.innerHTML=`Deficit z = ${zd.toFixed(2)} (model mean ${md.toFixed(1)}%) · Reserves z = ${zr.toFixed(2)} (mean $${mr.toFixed(0)}bn).<br><b>${s>2?'ANOMALY: deviation exceeds 2σ — inspect transmission channels.':s>1?'Watch: moderate deviation.':'Consistent with baseline ensemble.'}</b>`}
+ctl();run();
+</script></body></html>

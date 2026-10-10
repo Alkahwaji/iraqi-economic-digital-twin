@@ -1,0 +1,5 @@
+numpy>=1.24
+# optional
+# matplotlib>=3.7     (python -m iedt plot)
+# google-adk          (multi-agent layer: adk run app / adk web)
+# pytest>=7           (tests)

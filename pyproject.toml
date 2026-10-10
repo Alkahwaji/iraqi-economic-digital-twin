@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "iedt"
+version = "0.1.0"
+description = "Iraqi Economic Digital Twin: a minimum viable macro model connected to a multi-agent (Google ADK) analysis system"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24"]
+
+[project.optional-dependencies]
+plot = ["matplotlib>=3.7"]
+agents = ["google-adk"]
+dev = ["pytest>=7", "matplotlib>=3.7"]
+
+[project.scripts]
+iedt = "iedt.cli:main"
+
+[tool.setuptools]
+packages = ["iedt"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
